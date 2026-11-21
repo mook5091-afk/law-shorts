@@ -42,6 +42,7 @@ data/cases.json 에서 판례 1건 선택 (state.json으로 중복 발행 방지
 4. **Actions 탭 → daily-short → Run workflow** → `테스트 모드` 체크(기본값) → 실행
 5. 완료 후 실행 페이지 하단 **Artifacts**에서 `short-<번호>` 다운로드 → `short.mp4`, `script.json`(대본), `verify.json`(검증 결과), `post.txt`(캡션) 확인
 
+> `GEMINI_API_KEY`가 없어도 테스트 모드는 동작합니다(고정 샘플 대본 + 실제 음성으로 영상 생성, 검증 생략).
 > 테스트 모드는 발행도, `state.json` 변경도 하지 않으므로 몇 번이든 반복 실행해도 됩니다.
 
 ### 2단계 — 인스타그램 릴스
@@ -70,7 +71,7 @@ data/cases.json 에서 판례 1건 선택 (state.json으로 중복 발행 방지
 ### 4단계 — 실제 발행 확인 후 매일 자동 실행
 
 - 수동 실행에서 `테스트 모드` 체크를 **해제**하고 한 번 돌려 실제 업로드를 확인
-- 이후 매일 **18:17 KST**에 자동 실행됩니다(`.github/workflows/daily-short.yml`의 `cron`으로 변경)
+- Variables에 `ENABLE_SCHEDULE` = `true`를 넣으면 매일 **18:17 KST**에 자동 실행됩니다(`.github/workflows/daily-short.yml`의 `cron`으로 변경)
 - 발행된 판례는 `data/state.json`에 기록·커밋되어 다시 선택되지 않습니다
 
 ## 설정값 요약
@@ -88,6 +89,7 @@ data/cases.json 에서 판례 1건 선택 (state.json으로 중복 발행 방지
 
 | 이름 | 기본값 | 설명 |
 |---|---|---|
+| `ENABLE_SCHEDULE` | `false` | 매일 자동 실행 on/off. 인스타·유튜브 세팅이 끝난 뒤 `true`로 |
 | `ENABLE_YOUTUBE` | `false` | 유튜브 업로드 on/off |
 | `ENABLE_INSTAGRAM` | `true` | 인스타 업로드 on/off |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | 모델명이 바뀌거나 폐기되면 여기서 교체 |

@@ -38,8 +38,8 @@ def _gh_output(**kv: str) -> None:
                 f.write(f"{k}={v}\n")
 
 
-def make_script(settings: Settings, case: dict, offline: bool) -> dict:
-    if offline:
+def make_script(settings: Settings, case: dict, use_fixture: bool) -> dict:
+    if use_fixture:
         fx = ROOT / "tests" / "fixtures" / f"script_{case['id']}.json"
         if not fx.exists():
             fx = ROOT / "tests" / "fixtures" / "script_sample.json"
@@ -85,12 +85,16 @@ def run(args: argparse.Namespace, settings: Settings) -> int:
     workdir.mkdir(parents=True, exist_ok=True)
 
     # 1) 대본 생성 + 코드 안전 필터
-    script = make_script(settings, case, args.offline)
+    # 테스트 모드에서 Gemini 키가 없으면 고정 샘플 대본으로 대체(음성·영상은 실제로 생성)
+    use_fixture = args.offline or (args.test and not settings.gemini_api_key)
+    if use_fixture and not args.offline:
+        print("[warn] GEMINI_API_KEY 없음 — 테스트 모드이므로 고정 샘플 대본으로 진행합니다")
+    script = make_script(settings, case, use_fixture)
     (workdir / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # 2) 2차 검증: 판결요지와 결론 대조 (FAIL이면 오늘은 건너뜀)
-    if args.offline:
-        ok, reason = True, "오프라인 모드: 검증 생략"
+    if use_fixture:
+        ok, reason = True, "고정 샘플 대본: 검증 생략"
     else:
         ok, reason = verify_script(settings, case, script)
     (workdir / "verify.json").write_text(json.dumps({"pass": ok, "reason": reason}, ensure_ascii=False, indent=2),
