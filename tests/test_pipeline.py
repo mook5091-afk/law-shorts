@@ -60,3 +60,25 @@ def test_empty_env_uses_default(monkeypatch):
     s = Settings()
     assert s.tts_voice == "ko-KR-SunHiNeural"
     assert s.gemini_model == "gemini-2.5-flash"
+
+
+def test_platforms_auto_enable_from_tokens(monkeypatch):
+    from shorts.config import Settings
+    for k in ("ENABLE_INSTAGRAM", "ENABLE_YOUTUBE", "IG_USER_ID", "IG_ACCESS_TOKEN",
+              "YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"):
+        monkeypatch.delenv(k, raising=False)
+    s = Settings()
+    assert not s.enable_instagram and not s.enable_youtube
+    monkeypatch.setenv("YT_CLIENT_ID", "a"); monkeypatch.setenv("YT_CLIENT_SECRET", "b")
+    monkeypatch.setenv("YT_REFRESH_TOKEN", "c")
+    assert Settings().enable_youtube
+    monkeypatch.setenv("ENABLE_YOUTUBE", "false")
+    assert not Settings().enable_youtube
+
+
+def test_scheduled_run_idles_without_keys(monkeypatch):
+    from shorts import main as M
+    for k in ("GEMINI_API_KEY", "IG_USER_ID", "IG_ACCESS_TOKEN", "YT_REFRESH_TOKEN",
+              "TELEGRAM_BOT_TOKEN"):
+        monkeypatch.delenv(k, raising=False)
+    assert M.main([]) == 0   # 키 없으면 조용히 대기(성공 종료, 알림 없음)

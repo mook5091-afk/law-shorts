@@ -24,8 +24,9 @@ concurrency:
 
 jobs:
   run:
-    # 스케줄(자동) 실행은 Variables의 ENABLE_SCHEDULE=true일 때만 동작 → 키 세팅 전 매일 실패 방지
-    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_SCHEDULE == 'true'
+    # 자동 실행은 키가 모두 등록되기 전까지 코드가 스스로 '대기'하고 조용히 종료함
+    # (원하면 Variables에 ENABLE_SCHEDULE=false로 완전히 끌 수 있음)
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_SCHEDULE != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
