@@ -14,7 +14,8 @@ DISCLAIMER_NARRATION = "이 영상은 AI가 각색한 교육용 콘텐츠이며,
 
 
 def _env(name: str, default: str = "") -> str:
-    return os.environ.get(name, default).strip()
+    # GitHub Actions는 등록 안 된 vars를 빈 문자열로 넘기므로, 빈 값도 '미설정'으로 보고 기본값 사용
+    return os.environ.get(name, "").strip() or default
 
 
 def _flag(name: str, default: bool = False) -> bool:
