@@ -71,7 +71,20 @@ def build_texts(case: dict, script: dict) -> tuple[str, str, str]:
     return ig_caption, yt_title, yt_desc
 
 
+class NotConfigured(Exception):
+    """아직 키가 없어 자동 실행을 조용히 건너뜀(알림 없음)."""
+
+
 def run(args: argparse.Namespace, settings: Settings) -> int:
+    if not args.test:
+        # 자동 실행: 필요한 키가 다 들어오기 전에는 아무것도 하지 않음 → 매일 실패 알림 방지
+        missing = []
+        if not settings.gemini_api_key:
+            missing.append("GEMINI_API_KEY")
+        if not (settings.enable_instagram or settings.enable_youtube):
+            missing.append("인스타(IG_*) 또는 유튜브(YT_*) 토큰")
+        if missing:
+            raise NotConfigured("설정 대기 중 — 없음: " + ", ".join(missing))
     cases = C.load_cases()
     state = C.load_state()
     case = C.select_case(cases, state, require_verified=not args.test, case_id=args.case_id)
@@ -160,6 +173,9 @@ def main(argv: list[str] | None = None) -> int:
     settings = Settings()
     try:
         return run(args, settings)
+    except NotConfigured as e:
+        print(f"[idle] {e}")
+        return 0
     except Skip as e:
         msg = str(e)
         print(f"[skip] {msg}")

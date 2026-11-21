@@ -63,7 +63,7 @@ data/cases.json 에서 판례 1건 선택 (state.json으로 중복 발행 방지
    python scripts/get_youtube_token.py client_secret.json
    ```
 4. 출력값을 Secrets `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`에 저장
-5. Variables(같은 화면의 **Variables** 탭)에 `ENABLE_YOUTUBE` = `true`
+5. (자동) 토큰이 등록되면 유튜브 업로드가 자동으로 켜집니다. 처음엔 Variables에 `YT_PRIVACY=private` 권장
 
 > OAuth 동의 화면이 “테스트” 상태면 refresh token이 7일 후 만료됩니다. 운영 시 “프로덕션”으로 게시하세요.
 > 미인증 API 프로젝트로 올린 영상은 비공개로 잠길 수 있습니다(유튜브 정책). 처음엔 `YT_PRIVACY=private`로 확인 권장.
@@ -71,7 +71,7 @@ data/cases.json 에서 판례 1건 선택 (state.json으로 중복 발행 방지
 ### 4단계 — 실제 발행 확인 후 매일 자동 실행
 
 - 수동 실행에서 `테스트 모드` 체크를 **해제**하고 한 번 돌려 실제 업로드를 확인
-- Variables에 `ENABLE_SCHEDULE` = `true`를 넣으면 매일 **18:17 KST**에 자동 실행됩니다(`.github/workflows/daily-short.yml`의 `cron`으로 변경)
+- **Secrets만 넣으면 끝입니다.** `GEMINI_API_KEY` + (인스타 또는 유튜브 토큰)이 들어오는 순간부터 매일 **18:17 KST**에 자동 생성·업로드됩니다. 그 전에는 매일 조용히 대기만 합니다(알림 없음)(`.github/workflows/daily-short.yml`의 `cron`으로 변경)
 - 발행된 판례는 `data/state.json`에 기록·커밋되어 다시 선택되지 않습니다
 
 ## 설정값 요약
@@ -89,9 +89,9 @@ data/cases.json 에서 판례 1건 선택 (state.json으로 중복 발행 방지
 
 | 이름 | 기본값 | 설명 |
 |---|---|---|
-| `ENABLE_SCHEDULE` | `false` | 매일 자동 실행 on/off. 인스타·유튜브 세팅이 끝난 뒤 `true`로 |
-| `ENABLE_YOUTUBE` | `false` | 유튜브 업로드 on/off |
-| `ENABLE_INSTAGRAM` | `true` | 인스타 업로드 on/off |
+| `ENABLE_SCHEDULE` | (켜짐) | `false`로 두면 매일 자동 실행을 완전히 끔 |
+| `ENABLE_YOUTUBE` | 토큰 있으면 켜짐 | 유튜브 업로드 강제 on/off |
+| `ENABLE_INSTAGRAM` | 토큰 있으면 켜짐 | 인스타 업로드 강제 on/off |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | 모델명이 바뀌거나 폐기되면 여기서 교체 |
 | `TTS_VOICE` | `ko-KR-SunHiNeural` | edge-tts 음성 (`ko-KR-InJoonNeural` 등) |
 | `YT_PRIVACY` | `public` | `public` / `unlisted` / `private` |

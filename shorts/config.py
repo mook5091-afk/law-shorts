@@ -32,12 +32,15 @@ class Settings:
     tts_voice: str = field(default_factory=lambda: _env("TTS_VOICE", "ko-KR-SunHiNeural"))
     tts_rate: str = field(default_factory=lambda: _env("TTS_RATE", "+8%"))
 
-    enable_instagram: bool = field(default_factory=lambda: _flag("ENABLE_INSTAGRAM", True))
+    # 업로드 on/off: Variables로 명시하지 않으면 '토큰이 등록돼 있으면 자동 on'
+    enable_instagram: bool = field(default_factory=lambda: _flag(
+        "ENABLE_INSTAGRAM", bool(_env("IG_USER_ID") and _env("IG_ACCESS_TOKEN"))))
     ig_user_id: str = field(default_factory=lambda: _env("IG_USER_ID"))
     ig_access_token: str = field(default_factory=lambda: _env("IG_ACCESS_TOKEN"))
     ig_graph_version: str = field(default_factory=lambda: _env("IG_GRAPH_VERSION", "v21.0"))
 
-    enable_youtube: bool = field(default_factory=lambda: _flag("ENABLE_YOUTUBE", False))
+    enable_youtube: bool = field(default_factory=lambda: _flag(
+        "ENABLE_YOUTUBE", bool(_env("YT_CLIENT_ID") and _env("YT_CLIENT_SECRET") and _env("YT_REFRESH_TOKEN"))))
     yt_client_id: str = field(default_factory=lambda: _env("YT_CLIENT_ID"))
     yt_client_secret: str = field(default_factory=lambda: _env("YT_CLIENT_SECRET"))
     yt_refresh_token: str = field(default_factory=lambda: _env("YT_REFRESH_TOKEN"))
