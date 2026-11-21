@@ -51,3 +51,12 @@ def test_fixture_script_is_safe():
 def test_shape_rejects_empty():
     with pytest.raises(LLMError):
         validate_script_shape({"scenes": [], "conclusion": "x"})
+
+
+def test_empty_env_uses_default(monkeypatch):
+    from shorts.config import Settings
+    monkeypatch.setenv("TTS_VOICE", "")
+    monkeypatch.setenv("GEMINI_MODEL", "  ")
+    s = Settings()
+    assert s.tts_voice == "ko-KR-SunHiNeural"
+    assert s.gemini_model == "gemini-2.5-flash"
