@@ -1,0 +1,111 @@
+name: daily-short
+
+on:
+  schedule:
+    - cron: "17 9 * * *"   # 매일 18:17 KST (UTC 09:17). 정각은 지연이 잦아 분을 비켜 둠
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "테스트 모드 — 발행 없이 영상만 만들고 Artifacts로 업로드"
+        type: boolean
+        default: true
+      case_id:
+        description: "(선택) 특정 판례 id"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: write   # 발행 후 data/state.json 커밋(중복 발행 방지)용
+
+concurrency:
+  group: daily-short
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # 수동 실행일 때만 입력값을 따르고, 스케줄 실행은 항상 실제 발행
+      TEST_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.test_mode }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install system packages (FFmpeg, 한글 폰트)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk
+
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: Unit tests (안전 필터·선택 로직)
+        run: python -m pytest -q
+
+      - name: Generate (and publish)
+        id: gen
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          TTS_VOICE: ${{ vars.TTS_VOICE }}
+          ENABLE_INSTAGRAM: ${{ vars.ENABLE_INSTAGRAM }}
+          ENABLE_YOUTUBE: ${{ vars.ENABLE_YOUTUBE }}
+          YT_PRIVACY: ${{ vars.YT_PRIVACY }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 입력값은 env로만 전달(스크립트에 직접 치환하지 않음 → 셸 인젝션 방지)
+          CASE_ID: ${{ inputs.case_id }}
+        run: |
+          args=()
+          if [ "$TEST_MODE" = "true" ]; then args+=(--test); fi
+          if [ -n "$CASE_ID" ]; then args+=(--case-id "$CASE_ID"); fi
+          python -m shorts.main "${args[@]}"
+
+      - name: Upload video as artifact (테스트 모드)
+        if: always() && env.TEST_MODE == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: short-${{ github.run_number }}
+          path: |
+            output/*/short.mp4
+            output/*/script.json
+            output/*/verify.json
+            output/*/post.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Commit publish state
+        if: always() && steps.gen.outputs.state_changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/state.json
+          if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
+          git commit -m "chore: update publish state [skip ci]"
+          for i in 1 2 3; do git pull --rebase -q && git push && exit 0; sleep $((i*5)); done
+          exit 1
+
+      # 파이썬 단계 '밖'에서 실패한 경우(패키지 설치 실패 등)만 여기서 알림.
+      # 파이썬 단계의 실패는 코드가 직접 알림을 보내므로 중복 전송하지 않는다.
+      - name: Notify failure (Telegram)
+        if: failure() && steps.gen.outcome != 'failure'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -z "$TELEGRAM_BOT_TOKEN" ] && exit 0
+          curl -sS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=⚠️ [law-shorts] 워크플로 실패 (설치/커밋 단계). ${RUN_URL}"
