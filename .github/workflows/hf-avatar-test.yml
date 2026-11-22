@@ -1,0 +1,45 @@
+name: hf-avatar-test
+
+# HuggingFace ZeroGPU로 '말하는 캐릭터'가 되는지 실측한다. 수동 실행 전용.
+on:
+  workflow_dispatch:
+    inputs:
+      space:
+        description: "(선택) 시도할 Space id. 비우면 기본 후보 목록을 차례로 시도"
+        type: string
+        required: false
+        default: ""
+      character:
+        description: "캐릭터"
+        type: choice
+        options: [lawyer, worker, boss]
+        default: lawyer
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet edge-tts Pillow gradio_client
+      - name: 테스트 실행
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}   # 없어도 비로그인 할당량으로 돌아간다
+          SPACE: ${{ inputs.space }}
+          CHARACTER: ${{ inputs.character }}
+        run: |
+          ARGS="--character $CHARACTER"
+          if [ -n "$SPACE" ]; then ARGS="$ARGS --space $SPACE"; fi
+          python scripts/test_hf_avatar.py $ARGS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hf-avatar-test
+          path: output/hf_test/
+          retention-days: 7

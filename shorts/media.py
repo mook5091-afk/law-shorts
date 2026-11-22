@@ -9,6 +9,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from . import characters as CH
 from .config import DISCLAIMER, Settings
 
 W, H = 1080, 1920
@@ -131,21 +132,34 @@ def _footer(d, fpath):
     d.text(((W - w) / 2, FOOTER_Y), DISCLAIMER, font=f, fill=(240, 240, 240))
 
 
+CHAR_H = 620      # 캐릭터 상반신 높이
+CHAR_TOP = 300    # 화면 위에서 캐릭터 머리까지
+
+
 def render_scene(fpath: str, idx: int, total: int, header: str, caption: str, narration: str,
-                 out: Path) -> None:
+                 out: Path, character: str | None = None) -> None:
     top, bottom, accent = PALETTES[idx % len(PALETTES)]
     img = _gradient(top, bottom)
     d = ImageDraw.Draw(img)
     f_head = ImageFont.truetype(fpath, 46)
-    f_cap = ImageFont.truetype(fpath, 92)
-    f_body = ImageFont.truetype(fpath, 56)
+    f_cap = ImageFont.truetype(fpath, 88)
+    f_body = ImageFont.truetype(fpath, 54)
 
-    _draw_block(d, _wrap(header, f_head, W - 180, d), f_head, 170, (220, 220, 220))
-    d.text((W - 190, 260), f"{idx + 1}/{total}", font=f_head, fill=(200, 200, 200))
-    y = 620
+    _draw_block(d, _wrap(header, f_head, W - 180, d), f_head, 150, (220, 220, 220))
+    d.text((W - 190, 232), f"{idx + 1}/{total}", font=f_head, fill=(200, 200, 200))
+
+    if character:
+        # 캐릭터는 위쪽, 좌우를 번갈아 세워 장면이 단조롭지 않게
+        CH.paste_top(img, character, CH.PANEL_BUST, CHAR_H,
+                     anchor="right" if idx % 2 == 0 else "left", top=CHAR_TOP)
+        d = ImageDraw.Draw(img)
+        cap_y, body_y = CHAR_TOP + CHAR_H + 40, CHAR_TOP + CHAR_H + 190
+    else:
+        cap_y, body_y = 620, 900
+
     if caption:
-        y = _draw_block(d, _wrap(caption, f_cap, W - 160, d), f_cap, y, accent) + 60
-    _draw_block(d, _wrap(narration, f_body, W - 180, d), f_body, max(y, 900), (255, 255, 255), 1.45)
+        _draw_block(d, _wrap(caption, f_cap, W - 160, d), f_cap, cap_y, accent)
+    _draw_block(d, _wrap(narration, f_body, W - 180, d), f_body, body_y, (255, 255, 255), 1.42)
     _footer(d, fpath)
     img.save(out, "PNG")
 
@@ -186,12 +200,46 @@ def render_case_card(fpath: str, case: dict, out: Path) -> None:
 
 
 # ---------- 영상 ----------
-def make_segment(image: Path, audio: Path, out: Path, pad: float = 0.35) -> None:
+FPS = 30
+KEN_BURNS_ZOOM = 0.08  # 장면당 확대 비율(8%). 0이면 정지 화면
+
+
+def _ken_burns(idx: int, frames: int) -> str:
+    """zoompan 필터 문자열. 장면마다 방향을 바꿔 단조로움을 던다.
+
+    zoompan은 입력을 먼저 키워 두지 않으면 확대할 때 계단현상이 생기므로
+    scale로 2배 올린 뒤 잘라 쓴다.
+    """
+    z_in = f"min(1+{KEN_BURNS_ZOOM}*on/{frames},{1 + KEN_BURNS_ZOOM})"
+    z_out = f"max({1 + KEN_BURNS_ZOOM}-{KEN_BURNS_ZOOM}*on/{frames},1)"
+    mode = idx % 4
+    if mode == 0:      # 서서히 들어가기
+        z, x, y = z_in, "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
+    elif mode == 1:    # 서서히 빠지기
+        z, x, y = z_out, "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
+    elif mode == 2:    # 들어가며 위로
+        z, x, y = z_in, "iw/2-(iw/zoom/2)", f"ih/2-(ih/zoom/2)-(ih*0.04*on/{frames})"
+    else:              # 들어가며 옆으로
+        z, x, y = z_in, f"iw/2-(iw/zoom/2)+(iw*0.04*on/{frames})", "ih/2-(ih/zoom/2)"
+    return (f"scale={W*2}:{H*2},"
+            f"zoompan=z='{z}':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS},"
+            f"setsar=1")
+
+
+def make_segment(image: Path, audio: Path, out: Path, pad: float = 0.35,
+                 idx: int = 0, motion: bool = True) -> None:
     dur = audio_duration(audio) + pad
-    _run(["ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-i", str(image), "-i", str(audio),
-          "-af", f"apad=pad_dur={pad}", "-t", f"{dur:.3f}",
-          "-c:v", "libx264", "-tune", "stillimage", "-preset", "veryfast", "-r", "30",
-          "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", str(out)])
+    frames = max(1, int(dur * FPS))
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-i", str(image), "-i", str(audio),
+           "-af", f"apad=pad_dur={pad}", "-t", f"{dur:.3f}"]
+    if motion and KEN_BURNS_ZOOM > 0:
+        cmd += ["-vf", _ken_burns(idx, frames)]
+    else:
+        cmd += ["-tune", "stillimage"]
+    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-r", str(FPS),
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+            str(out)]
+    _run(cmd)
 
 
 def concat(segments: list[Path], out: Path) -> None:
@@ -221,14 +269,16 @@ def build_video(settings: Settings, case: dict, script: dict, workdir: Path, out
     header = script.get("hook") or case["title"]
     for i, s in enumerate(scenes):
         img = workdir / f"f{i:02d}.png"
-        render_scene(fpath, i, len(scenes), header, s.get("caption", ""), s["narration"], img)
+        who = CH.pick(s["narration"], s.get("character"))
+        render_scene(fpath, i, len(scenes), header, s.get("caption", ""), s["narration"], img,
+                     character=who)
         seg = workdir / f"s{i:02d}.mp4"
-        make_segment(img, audios[i], seg)
+        make_segment(img, audios[i], seg, idx=i)
         segs.append(seg)
     card = workdir / "f_case.png"
     render_case_card(fpath, case, card)
     seg = workdir / "s_case.mp4"
-    make_segment(card, audios[-1], seg, pad=2.5)  # 원문 정보를 읽을 시간 확보
+    make_segment(card, audios[-1], seg, pad=2.5, motion=False)  # 판례 원문은 정지 화면으로 읽히게
     segs.append(seg)
     concat(segs, out)
     return out
