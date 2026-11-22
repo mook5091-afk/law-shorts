@@ -1,11 +1,16 @@
 name: webtoon-demo
 
-# 흑백 선화 웹툰 숏폼 1편을 음성까지 넣어 만든다. 결과는 Artifacts로 내려받는다.
+# 흑백 선화 웹툰 숏폼 1편을 음성까지 넣어 만든다.
+# 결과를 samples/ 에 커밋한다 — Artifacts는 모바일에서 내려받기 어렵다.
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: webtoon-demo
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -19,6 +24,16 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk ffmpeg
       - run: pip install --quiet edge-tts Pillow
       - run: python scripts/build_webtoon_demo.py
+      - name: samples/ 에 커밋
+        run: |
+          mkdir -p samples
+          cp output/webtoon_demo/webtoon_short.mp4 samples/webtoon_short.mp4
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add samples/webtoon_short.mp4
+          git diff --cached --quiet && { echo "변경 없음"; exit 0; }
+          git commit -m "samples: 웹툰 숏폼 데모(음성 포함) 갱신"
+          git push
       - uses: actions/upload-artifact@v4
         with:
           name: webtoon-short
