@@ -11,7 +11,10 @@ import sys
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/spreadsheets",  # 숏폼로그 시트 읽기/기록(백업 자동화용)
+]
 
 if len(sys.argv) != 2:
     sys.exit("사용법: python scripts/get_youtube_token.py client_secret.json")

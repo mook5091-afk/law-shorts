@@ -68,21 +68,25 @@ def upload_instagram_reel(settings: Settings, video: Path, caption: str) -> str:
         return media_id
 
 
+# ---------- Google OAuth (YouTube 업로드 + 시트 읽기/쓰기 공용) ----------
+def google_credentials(settings: Settings):
+    from google.oauth2.credentials import Credentials
+    # scopes=None: 발급 당시 동의한 권한(youtube.upload, spreadsheets)을 그대로 사용
+    return Credentials(
+        token=None, refresh_token=settings.yt_refresh_token, client_id=settings.yt_client_id,
+        client_secret=settings.yt_client_secret, token_uri="https://oauth2.googleapis.com/token",
+    )
+
+
 # ---------- YouTube (Data API v3) ----------
 def upload_youtube(settings: Settings, video: Path, title: str, description: str,
                    tags: list[str]) -> str:
     if not (settings.yt_client_id and settings.yt_client_secret and settings.yt_refresh_token):
         raise PublishError("YT_CLIENT_ID / YT_CLIENT_SECRET / YT_REFRESH_TOKEN 미설정")
-    from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    creds = Credentials(
-        token=None, refresh_token=settings.yt_refresh_token, client_id=settings.yt_client_id,
-        client_secret=settings.yt_client_secret, token_uri="https://oauth2.googleapis.com/token",
-        scopes=["https://www.googleapis.com/auth/youtube.upload"],
-    )
-    yt = build("youtube", "v3", credentials=creds, cache_discovery=False)
+    yt = build("youtube", "v3", credentials=google_credentials(settings), cache_discovery=False)
     body = {
         "snippet": {"title": title[:95], "description": description[:4900],
                     "tags": [t.lstrip("#") for t in tags][:15], "categoryId": "27"},  # 27 = Education
