@@ -69,8 +69,9 @@ def _ellipse_bubble(d, text, font, cx, cy, max_w, tail_to) -> None:
 
 
 def render_cut(fpath: str, narration: str, lines_lr: tuple[str, str] | None,
-               scene_image: Path | None, out) -> None:
-    """narration: 위쪽 서술. lines_lr: (왼쪽 대사, 오른쪽 대사). scene_image: 장면 일러스트."""
+               scene_image: Path | None, out, callout: str | None = None) -> None:
+    """narration: 위쪽 서술. lines_lr: (왼쪽 대사, 오른쪽 대사).
+    callout: 숫자처럼 크게 보여야 할 한 줄 — 서술 아래 상자 안에 넣는다."""
     img = Image.new("RGB", (W, H), PAPER)
     d = ImageDraw.Draw(img)
     d.rectangle([MARGIN, MARGIN, W - MARGIN, H - MARGIN], outline=INK, width=BORDER)
@@ -82,18 +83,35 @@ def render_cut(fpath: str, narration: str, lines_lr: tuple[str, str] | None,
         d.text(((W - d.textlength(l, font=f_nar)) / 2, y), l, font=f_nar, fill=INK)
         y += int(f_nar.size * 1.42)
 
+    # 1-2) 강조 상자 — 숫자는 글로 흘리면 안 읽힌다
+    if callout:
+        f_co, co_lines = _fit_font(d, callout, fpath, W - 300, 2, 76, floor=44)
+        gap = int(f_co.size * 1.3)
+        bh = gap * len(co_lines) + 54
+        y += 30
+        d.rounded_rectangle([110, y, W - 110, y + bh], radius=22,
+                            fill=(242, 242, 240), outline=INK, width=BORDER)
+        ty = y + 27
+        for l in co_lines:
+            d.text(((W - d.textlength(l, font=f_co)) / 2, ty), l, font=f_co, fill=INK)
+            ty += gap
+        y += bh
+
     # 2) 말풍선 둘 — 아래 그림 속 인물을 향해 꼬리가 내려간다
-    bub_cy = max(y + 170, 540)
-    if lines_lr:
+    if lines_lr and any(lines_lr):
+        bub_cy = max(y + 170, 540)
         left, right = lines_lr
         f_b = ImageFont.truetype(fpath, 46)
         if left:
             _ellipse_bubble(d, left, f_b, 300, bub_cy, 430, tail_to=(250, bub_cy + 190))
         if right:
             _ellipse_bubble(d, right, f_b, 782, bub_cy, 430, tail_to=(840, bub_cy + 190))
+        top = bub_cy + 220
+    else:
+        # 말풍선이 없으면 그림을 바로 올려 빈 공간을 없앤다
+        top = y + 70
 
     # 3) 장면 그림 — 아래쪽을 채운다
-    top = bub_cy + 220
     avail_h = H - MARGIN - 120 - top
     if scene_image and Path(scene_image).exists():
         sc = Image.open(scene_image).convert("L").convert("RGB")

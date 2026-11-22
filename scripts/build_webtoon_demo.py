@@ -26,24 +26,34 @@ PAUSE = 0.35                              # 대사 사이 숨
 SCENES = ROOT / "assets" / "scenes"
 OUT = ROOT / "output" / "webtoon_demo"
 
-# (서술문, 왼쪽 대사, 오른쪽 대사, 장면 그림, 길이(초))
+# (서술문, 왼쪽 대사, 오른쪽 대사, 장면 그림, 강조 상자)
 CUTS = [
-    ("월급에 퇴직금을 얹어 준다는 말,\n그때는 고마운 줄만 알았다.",
-     "월급에 퇴직금도\n넣어 줄게!", "정말요?\n감사합니다!", "mill_deal.png", 5.0),
-    ("몇 해가 흘렀다.\n떠날 때가 되었다.",
-     "그동안 고생했네.", "이제 정리해야죠.", "mill_deal.png", 4.5),
-    ("그런데 퇴직금 이야기를 꺼내자\n주인의 표정이 달라졌다.",
-     "퇴직금은\n이미 다 줬잖나.", "그건 월급이었는데요…", "mill_deal.png", 5.5),
+    ("월급에 퇴직금을 얹어 준다는 말.",
+     "월급에 퇴직금도\n넣어 줄게!", "정말요?\n감사합니다!", "mill_deal.png", None),
+
+    ("몇 해 뒤, 떠날 때가 되자\n주인의 말이 달라졌다.",
+     "퇴직금은\n이미 다 줬잖나.", "그건 월급이었는데요…", "mill_deal.png", None),
+
     ("결국 원님 앞에 섰다.",
-     "저는 다 줬습니다.", "따로 받은 적 없습니다.", "court.png", 4.5),
-    ("원님의 판단은 분명했다.\n월급에 퇴직금을 나눠 넣는 약속은 무효다.",
-     "", "", "court.png", 6.0),
-    ("그래서 그동안 받은 돈은\n퇴직금으로 인정되지 않는다.\n퇴직금은 따로 줘야 한다.",
-     "", "", "court.png", 6.0),
-    ("다만 받은 돈은 돌려줘야 한다.\n퇴직금에서 깎을 수 있는 건\n절반을 넘는 부분까지만.",
-     "", "", "court.png", 6.0),
-    ("퇴직금은 미리 쪼갤 수 없다.\n떠날 때, 제대로.",
-     "", "", "mill_deal.png", 5.0),
+     "저는 다 줬습니다.", "따로 받은 적\n없습니다.", "court.png", None),
+
+    ("원님의 판단.",
+     "", "", "court.png", "월급에 퇴직금을 쪼개 주는 약속은\n무효다"),
+
+    ("그러니 그동안 준 돈은\n퇴직금을 준 것이 아니다.\n퇴직금은 따로 줘야 한다.",
+     "", "", "court.png", None),
+
+    ("돌쇠의 사정은 이랬다.",
+     "", "", "court.png", "퇴직금 1,000만원\n미리 받은 돈 800만원"),
+
+    ("주인은 800만원을 돌려받을 권리가 있다.\n하지만 퇴직금에서 깎을 수 있는 건\n절반까지다.",
+     "", "", "court.png", "깎을 수 있는 돈은 500만원까지"),
+
+    ("그래서 돌쇠는 떠나는 날\n현금을 손에 쥔다.",
+     "", "", "mill_deal.png", "돌쇠가 받는 돈 500만원"),
+
+    ("남은 300만원은 따로 돌려주면 된다.\n퇴직금의 절반은\n어떤 경우에도 지켜진다.",
+     "", "", "mill_deal.png", None),
 ]
 
 
@@ -105,11 +115,12 @@ def main() -> int:
 
     OUT.mkdir(parents=True, exist_ok=True)
     segs = []
-    for i, (nar, left, right, scene, _) in enumerate(CUTS):
+    for i, (nar, left, right, scene, callout) in enumerate(CUTS):
         png = OUT / f"cut{i:02d}.png"
         BW.render_cut(FONT, nar, (left, right) if (left or right) else None,
-                      SCENES / scene, png)
-        audio, dur = cut_audio(i, nar, left, right, OUT, args.silent)
+                      SCENES / scene, png, callout=callout)
+        spoken = nar + ((" " + callout.replace("\n", " ")) if callout else "")
+        audio, dur = cut_audio(i, spoken, left, right, OUT, args.silent)
         dur += 0.5  # 끝에 여백 — 자막을 다 읽을 시간
         seg = OUT / f"seg{i:02d}.mp4"
 
