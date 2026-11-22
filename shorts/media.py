@@ -157,8 +157,8 @@ def render_case_card(fpath: str, case: dict, out: Path) -> None:
     f_t = ImageFont.truetype(fpath, 60)
     f_k = ImageFont.truetype(fpath, 40)
     f_v = ImageFont.truetype(fpath, 44)
-    y = _draw_block(d, ["오늘의 판례 원문 정보"], f_t, 200, (255, 211, 105)) + 40
-    rows = [
+    y = _draw_block(d, [case.get("card_title", "오늘의 판례 원문 정보")], f_t, 200, (255, 211, 105)) + 40
+    rows = case.get("card_rows") or [
         ("법원", f"{case['court']} {case.get('decision_type', '')}".strip()),
         ("선고일", case["date"]),
         ("사건번호", case["case_no"]),
@@ -167,7 +167,7 @@ def render_case_card(fpath: str, case: dict, out: Path) -> None:
     for k, v in rows:
         d.text((90, y), k, font=f_k, fill=(170, 170, 170))
         y = _draw_block(d, _wrap(v, f_v, W - 180, d), f_v, y + 55, (255, 255, 255), center=False) + 25
-    d.text((90, y + 10), "판결요지", font=f_k, fill=(170, 170, 170))
+    d.text((90, y + 10), case.get("body_label", "판결요지"), font=f_k, fill=(170, 170, 170))
     # 판결요지는 원문이므로 자르지 않고, 들어갈 때까지 글자 크기를 줄인다
     top, bottom = y + 70, FOOTER_Y - 130
     for size in range(38, 21, -2):

@@ -1,0 +1,58 @@
+name: backup-shorts
+
+# 2순위 백업: 회사 컴퓨터(1순위)가 FAILOVER_HOURS 동안 숏폼로그에 기록이 없을 때만 대신 생성·업로드
+on:
+  schedule:
+    - cron: "43 0,4,8,12 * * *"   # KST 09:43, 13:43, 17:43, 21:43
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run(계획만 출력) / run / force(1순위 무시)"
+        type: choice
+        options: [dry-run, run, force]
+        default: dry-run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-shorts
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_BACKUP != 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk
+          pip install -r requirements.txt
+      - name: Run backup
+        env:
+          SHORTS_SHEET_ID: ${{ secrets.SHORTS_SHEET_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          YT_PRIVACY: ${{ vars.YT_PRIVACY }}
+          FAILOVER_HOURS: ${{ vars.FAILOVER_HOURS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$MODE" in
+            dry-run) python -m shorts.backup --dry-run ;;
+            force)   python -m shorts.backup --force ;;
+            *)       python -m shorts.backup ;;
+          esac

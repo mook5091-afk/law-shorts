@@ -163,3 +163,20 @@ data/state.json   발행 이력·검증 실패 횟수
 - 안전 필터는 보수적으로 설계되어 “3조 원” 외의 `N조`, `N항` 같은 일상 표현도 탈락시킵니다(재생성으로 해결).
 - 2차 검증도 LLM이므로 100% 보장은 아닙니다. 초기엔 테스트 모드 결과(`script.json`)를 사람이 함께 검토하는 것을 권장합니다.
 - 생성물은 교육용 각색이며 법률자문이 아닙니다.
+
+---
+
+## 숏폼 백업 자동화 (2순위)
+
+기존 회사 컴퓨터의 숏폼 프로그램이 **1순위**, 이 저장소의 `backup-shorts` 워크플로가 **2순위**입니다.
+
+- 하루 4회(KST 09:43/13:43/17:43/21:43) `Blogger자동포스팅_로그` 시트의 `숏폼로그` 탭을 확인
+- 1순위 기록이 `FAILOVER_HOURS`(기본 8시간) 동안 없으면 → 회사 컴퓨터가 꺼진 것으로 보고 대신 실행
+  1. 1순위가 만들고 못 올린 글(MADE/PARTIAL) → 블로그 본문으로 영상 재생성 후 빠진 플랫폼만 업로드
+  2. 최근 7일 새 블로그 글 중 영상이 없는 글
+- 결과는 같은 `숏폼로그` 탭에 `형식=backup:story`, `비고=클라우드 백업`으로 기록 → 중복 업로드 방지
+- 1회 최대 2건, 유튜브 하루 6건·인스타 10건(1순위와 합산)
+
+**필요한 Secrets:** `SHORTS_SHEET_ID`, `GEMINI_API_KEY`, `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`, (인스타) `IG_USER_ID`, `IG_ACCESS_TOKEN`
+**유튜브 토큰은 `scripts/get_youtube_token.py`로 발급**(유튜브 업로드 + 시트 권한을 한 번에 받음). 구글 클라우드 프로젝트에서 **YouTube Data API v3와 Google Sheets API 둘 다** 사용 설정해야 합니다.
+점검: Actions → backup-shorts → Run workflow → `dry-run`(계획만 출력)
