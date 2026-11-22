@@ -75,10 +75,18 @@ def main() -> int:
     for space in (args.space or DEFAULT_SPACES):
         print(f"\n=== {space} ===")
         t0 = time.time()
-        try:
-            client = Client(space, hf_token=token)
-        except Exception as e:
-            print(f"  [접속 실패] {type(e).__name__}: {str(e)[:200]}")
+        client = None
+        # gradio_client는 버전에 따라 token= / hf_token= 을 쓴다
+        for kw in ("token", "hf_token"):
+            try:
+                client = Client(space, **({kw: token} if token else {}))
+                break
+            except TypeError:
+                continue
+            except Exception as e:
+                print(f"  [접속 실패] {type(e).__name__}: {str(e)[:250]}")
+                break
+        if client is None:
             continue
         try:
             api = client.view_api(return_format="dict")
