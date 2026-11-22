@@ -14,6 +14,10 @@ on:
         type: choice
         options: [lawyer, worker, boss]
         default: lawyer
+      probe:
+        description: "생존 여부·엔드포인트만 확인(할당량 소모 없음)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,9 +37,11 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}   # 없어도 비로그인 할당량으로 돌아간다
           SPACE: ${{ inputs.space }}
           CHARACTER: ${{ inputs.character }}
+          PROBE: ${{ inputs.probe }}
         run: |
           ARGS="--character $CHARACTER"
           if [ -n "$SPACE" ]; then ARGS="$ARGS --space $SPACE"; fi
+          if [ "$PROBE" = "true" ]; then ARGS="$ARGS --probe"; fi
           python scripts/test_hf_avatar.py $ARGS
       - uses: actions/upload-artifact@v4
         if: always()

@@ -23,6 +23,8 @@ sys.path.insert(0, str(ROOT))
 
 # 후보 Space. 앞에서부터 시도하고, 살아 있는 첫 번째를 쓴다.
 DEFAULT_SPACES = [
+    "lulavc/AnimaStudio",            # EchoMimic V3 Flash — 사진+텍스트/음성 → 말하는 영상
+    "multimodalart/EchoMimic-zero",
     "fffiloni/tts-hallo-talking-portrait",
     "vinthony/SadTalker",
     "KwaiVGI/LivePortrait",
@@ -59,6 +61,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--space", action="append", default=None, help="시도할 Space id(여러 번 가능)")
     ap.add_argument("--character", default="lawyer")
+    ap.add_argument("--probe", action="store_true",
+                    help="호출하지 않고 생존 여부와 엔드포인트 서명만 본다(할당량 소모 없음)")
     args = ap.parse_args()
 
     from gradio_client import Client, handle_file
@@ -90,23 +94,50 @@ def main() -> int:
             continue
         try:
             api = client.view_api(return_format="dict")
-            names = list(api.get("named_endpoints", {}))
-            print(f"  [엔드포인트] {names[:5]}")
+            eps = api.get("named_endpoints", {})
         except Exception as e:
             print(f"  [API 조회 실패] {type(e).__name__}: {str(e)[:150]}")
-            names = []
-        if not names:
             continue
+        if not eps:
+            print("  [엔드포인트 없음]")
+            continue
+
+        print(f"  [살아있음] 엔드포인트 {len(eps)}개")
+        for name, spec in eps.items():
+            params = [f"{p.get('parameter_name') or p.get('label')}:"
+                      f"{p.get('python_type', {}).get('type', '?')}"
+                      f"{'' if p.get('parameter_has_default') else '*'}"
+                      for p in spec.get("parameters", [])]
+            print(f"    {name}  ({', '.join(params) or '인자 없음'})")
+        if args.probe:
+            continue
+
+        # 얼굴/음성을 받을 만한 엔드포인트를 고른다
+        target = next((n for n in eps if any(k in n.lower()
+                                             for k in ("video", "talk", "generate", "create"))),
+                      next(iter(eps)))
+        spec = eps[target]
+        kwargs, leftovers = {}, [str(face), str(audio)]
+        for prm in spec.get("parameters", []):
+            key = (prm.get("parameter_name") or "").lower()
+            lbl = (prm.get("label") or "").lower()
+            if any(k in key + lbl for k in ("image", "portrait", "source", "photo")):
+                kwargs[prm["parameter_name"]] = handle_file(str(face))
+            elif any(k in key + lbl for k in ("audio", "voice", "driven", "wav")):
+                kwargs[prm["parameter_name"]] = handle_file(str(audio))
+        if not kwargs:
+            print(f"  [건너뜀] {target}: 얼굴/음성 인자를 못 찾음")
+            continue
+        print(f"  [호출] {target} ← {list(kwargs)}")
         try:
-            result = client.predict(handle_file(str(face)), handle_file(str(audio)),
-                                    api_name=names[0])
+            result = client.predict(api_name=target, **kwargs)
             print(f"  [성공] {time.time() - t0:.1f}초 — {str(result)[:300]}")
             return 0
         except Exception as e:
             msg = str(e)
             print(f"  [생성 실패] {type(e).__name__}: {msg[:400]}")
             if "quota" in msg.lower():
-                print("  >> 할당량 메시지입니다. 남은 초가 적혀 있으면 그게 실제 한도입니다.")
+                print("  >> 할당량 메시지. 남은 초가 적혀 있으면 그게 실제 한도입니다.")
 
     print("\n모든 후보 Space에서 실패했습니다. --space 로 다른 Space를 지정해 보세요.")
     return 1
