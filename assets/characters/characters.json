@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "style_lock": "Pixar-style 3D animated character, clean soft studio lighting, neutral light-gray background, soft rounded friendly proportions, Korean ethnicity, consistent art style, no text, no watermark",
+  "sheet_layout": "3 panels side by side: full-body front view / upper-body three-quarter view / face close-up",
+  "source": "Canva generate-image",
+  "native_size": [2720, 1536],
+  "characters": [
+    {
+      "id": "lawyer",
+      "name": "김변",
+      "role": "해설자",
+      "file": "lawyer_sheet.png",
+      "canva_media_id": "MAHbj2ewpNE",
+      "canva_url": "https://www.canva.com/M/MAHbj2ewpNE",
+      "prompt": "Korean male lawyer in his late 30s, short neat black hair, thin rectangular glasses, navy suit with white shirt and burgundy tie, calm confident expression, holding a slim folder. Face close-up with a slight smile.",
+      "quality": "A"
+    },
+    {
+      "id": "worker",
+      "name": "박씨",
+      "role": "사연 주인공",
+      "file": "worker_sheet.png",
+      "canva_media_id": "MAHbj6VNoOk",
+      "canva_url": "https://www.canva.com/M/MAHbj6VNoOk",
+      "prompt": "Korean male factory worker in his early 40s, slightly messy black hair, no glasses, gray work jacket over a beige shirt, worn cross-body bag, tired but honest expression. Face close-up with a worried look.",
+      "quality": "B+",
+      "note": "사실적 묘사가 강해 다른 둘보다 픽사풍이 약함. 재생성 후보."
+    },
+    {
+      "id": "boss",
+      "name": "최사장",
+      "role": "대립 역",
+      "file": "boss_sheet.png",
+      "canva_media_id": "MAHbj0XDoHo",
+      "canva_url": "https://www.canva.com/M/MAHbj0XDoHo",
+      "prompt": "Korean male company owner in his 50s, swept-back graying hair, light-blue dress shirt with rolled-up sleeves, no tie, arms crossed, stern authoritative expression. Face close-up with a frown.",
+      "quality": "A-"
+    }
+  ]
+}
