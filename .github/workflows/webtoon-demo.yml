@@ -1,0 +1,26 @@
+name: webtoon-demo
+
+# 흑백 선화 웹툰 숏폼 1편을 음성까지 넣어 만든다. 결과는 Artifacts로 내려받는다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk ffmpeg
+      - run: pip install --quiet edge-tts Pillow
+      - run: python scripts/build_webtoon_demo.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webtoon-short
+          path: output/webtoon_demo/webtoon_short.mp4
+          retention-days: 7
