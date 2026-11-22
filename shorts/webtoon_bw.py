@@ -125,3 +125,41 @@ def render_cut(fpath: str, narration: str, lines_lr: tuple[str, str] | None,
     d.text(((W - w) / 2, H - MARGIN - 78), DISCLAIMER, font=f_foot, fill=(120, 120, 120))
 
     img.save(out, "PNG")
+
+
+def render_case_card(fpath: str, case: dict, out) -> None:
+    """마지막 컷 — 판례 원문 정보. 값은 cases.json 그대로 쓴다(LLM을 거치지 않는다)."""
+    img = Image.new("RGB", (W, H), PAPER)
+    d = ImageDraw.Draw(img)
+    d.rectangle([MARGIN, MARGIN, W - MARGIN, H - MARGIN], outline=INK, width=BORDER)
+
+    f_lab = ImageFont.truetype(fpath, 40)
+    f_val = ImageFont.truetype(fpath, 58)
+    f_tit = ImageFont.truetype(fpath, 52)
+
+    y = 300
+    d.text(((W - d.textlength("이 이야기의 판례", font=f_lab)) / 2, y),
+           "이 이야기의 판례", font=f_lab, fill=(120, 120, 120))
+    y += 120
+
+    for line in _wrap(d, case.get("title", ""), f_tit, W - 240):
+        d.text(((W - d.textlength(line, font=f_tit)) / 2, y), line, font=f_tit, fill=INK)
+        y += int(f_tit.size * 1.4)
+
+    y += 80
+    d.line([(180, y), (W - 180, y)], fill=INK, width=3)
+    y += 70
+
+    court = " ".join(x for x in (case.get("court"), case.get("decision_type")) if x)
+    for text in (court, case.get("date", ""), case.get("case_no", "")):
+        if not text:
+            continue
+        d.text(((W - d.textlength(text, font=f_val)) / 2, y), text, font=f_val, fill=INK)
+        y += int(f_val.size * 1.5)
+
+    f_foot = ImageFont.truetype(fpath, 30)
+    for n, text in enumerate([DISCLAIMER, "개별 사안은 노무사·변호사와 상담하세요"]):
+        w = d.textlength(text, font=f_foot)
+        d.text(((W - w) / 2, H - MARGIN - 130 + n * 48), text, font=f_foot, fill=(120, 120, 120))
+
+    img.save(out, "PNG")

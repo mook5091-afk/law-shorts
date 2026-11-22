@@ -1,9 +1,16 @@
 name: webtoon-demo
 
-# 흑백 선화 웹툰 숏폼 1편을 음성까지 넣어 만든다.
-# 결과를 samples/ 에 커밋한다 — Artifacts는 모바일에서 내려받기 어렵다.
+# 흑백 선화 웹툰 숏폼 1편을 음성까지 넣어 만들고 samples/ 에 커밋한다.
 on:
   workflow_dispatch:
+    inputs:
+      case_id:
+        description: "판례 id (webtoon_scripts.py 에 대본이 있어야 함)"
+        type: choice
+        options:
+          - severance-installment-2010
+          - ordinary-wage-fixedness-2024
+        default: severance-installment-2010
 
 permissions:
   contents: write
@@ -15,7 +22,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,19 +30,20 @@ jobs:
           python-version: "3.12"
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk ffmpeg
       - run: pip install --quiet edge-tts Pillow
-      - run: python scripts/build_webtoon_demo.py
+      - name: 영상 생성
+        env:
+          CASE_ID: ${{ inputs.case_id }}
+        run: python scripts/build_webtoon_demo.py --case "$CASE_ID"
       - name: samples/ 에 커밋
+        env:
+          CASE_ID: ${{ inputs.case_id }}
         run: |
           mkdir -p samples
-          cp output/webtoon_demo/webtoon_short.mp4 samples/webtoon_short.mp4
+          cp "output/webtoon_demo/$CASE_ID/webtoon_short.mp4" "samples/$CASE_ID.mp4"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add samples/webtoon_short.mp4
+          git add "samples/$CASE_ID.mp4"
           git diff --cached --quiet && { echo "변경 없음"; exit 0; }
-          git commit -m "samples: 웹툰 숏폼 데모(음성 포함) 갱신"
+          git commit -m "samples: $CASE_ID 웹툰 숏폼 갱신"
+          git pull --rebase --autostash
           git push
-      - uses: actions/upload-artifact@v4
-        with:
-          name: webtoon-short
-          path: output/webtoon_demo/webtoon_short.mp4
-          retention-days: 7

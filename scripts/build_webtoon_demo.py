@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -26,35 +27,17 @@ PAUSE = 0.35                              # 대사 사이 숨
 SCENES = ROOT / "assets" / "scenes"
 OUT = ROOT / "output" / "webtoon_demo"
 
-# (서술문, 왼쪽 대사, 오른쪽 대사, 장면 그림, 강조 상자)
-CUTS = [
-    ("월급에 퇴직금을 얹어 준다는 말.",
-     "월급에 퇴직금도\n넣어 줄게!", "정말요?\n감사합니다!", "mill_deal.png", None),
+from webtoon_scripts import SCRIPTS  # noqa: E402
 
-    ("몇 해 뒤, 떠날 때가 되자\n주인의 말이 달라졌다.",
-     "퇴직금은\n이미 다 줬잖나.", "그건 월급이었는데요…", "mill_deal.png", None),
 
-    ("결국 원님 앞에 섰다.",
-     "저는 다 줬습니다.", "따로 받은 적\n없습니다.", "court.png", None),
-
-    ("원님의 판단.",
-     "", "", "court.png", "월급에 퇴직금을 쪼개 주는 약속은\n무효다"),
-
-    ("그러니 그동안 준 돈은\n퇴직금을 준 것이 아니다.\n퇴직금은 따로 줘야 한다.",
-     "", "", "court.png", None),
-
-    ("돌쇠의 사정은 이랬다.",
-     "", "", "court.png", "퇴직금 1,000만원\n미리 받은 돈 800만원"),
-
-    ("주인은 800만원을 돌려받을 권리가 있다.\n하지만 퇴직금에서 깎을 수 있는 건\n절반까지다.",
-     "", "", "court.png", "깎을 수 있는 돈은 500만원까지"),
-
-    ("그래서 돌쇠는 떠나는 날\n현금을 손에 쥔다.",
-     "", "", "mill_deal.png", "돌쇠가 받는 돈 500만원"),
-
-    ("남은 300만원은 따로 돌려주면 된다.\n퇴직금의 절반은\n어떤 경우에도 지켜진다.",
-     "", "", "mill_deal.png", None),
-]
+def load_case(case_id: str) -> dict:
+    """판례 원문 정보는 cases.json 그대로 쓴다 — 지어내면 안 되는 값이다."""
+    data = json.loads((ROOT / "data" / "cases.json").read_text(encoding="utf-8"))
+    cases = data if isinstance(data, list) else data.get("cases", [])
+    for c in cases:
+        if c.get("id") == case_id:
+            return c
+    raise SystemExit(f"cases.json 에 '{case_id}' 가 없습니다.")
 
 
 def tts(text: str, voice: str, out: Path) -> Path:
@@ -111,18 +94,25 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--silent", action="store_true",
                     help="edge-tts를 쓸 수 없는 환경에서 무음으로 만든다")
+    ap.add_argument("--case", default="severance-installment-2010", help="판례 id")
     args = ap.parse_args()
 
-    OUT.mkdir(parents=True, exist_ok=True)
+    cuts = SCRIPTS.get(args.case)
+    if not cuts:
+        raise SystemExit(f"'{args.case}' 대본이 webtoon_scripts.py 에 없습니다. "
+                         f"있는 것: {', '.join(SCRIPTS)}")
+    case = load_case(args.case)
+    out_dir = OUT / args.case
+    out_dir.mkdir(parents=True, exist_ok=True)
     segs = []
-    for i, (nar, left, right, scene, callout) in enumerate(CUTS):
-        png = OUT / f"cut{i:02d}.png"
+    for i, (nar, left, right, scene, callout) in enumerate(cuts):
+        png = out_dir / f"cut{i:02d}.png"
         BW.render_cut(FONT, nar, (left, right) if (left or right) else None,
                       SCENES / scene, png, callout=callout)
         spoken = nar + ((" " + callout.replace("\n", " ")) if callout else "")
-        audio, dur = cut_audio(i, spoken, left, right, OUT, args.silent)
+        audio, dur = cut_audio(i, spoken, left, right, out_dir, args.silent)
         dur += 0.5  # 끝에 여백 — 자막을 다 읽을 시간
-        seg = OUT / f"seg{i:02d}.mp4"
+        seg = out_dir / f"seg{i:02d}.mp4"
 
         # 컷마다 다른 Ken Burns — 같은 그림을 써도 지루하지 않게
         frames = int(dur * 30)
@@ -139,11 +129,27 @@ def main() -> int:
              "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
              "-ar", "44100", "-ac", "2", str(seg)])
         segs.append(seg)
-        print(f"  컷 {i + 1}/{len(CUTS)} — {dur:.1f}초")
+        print(f"  컷 {i + 1}/{len(cuts)} — {dur:.1f}초")
 
-    lst = OUT / "list.txt"
+    # 마지막 컷 — 판례 원문 정보
+    card = out_dir / "cut_case.png"
+    BW.render_case_card(FONT, case, card)
+    card_text = (f"이 이야기의 판례는 {case['court']} {case['date']} 선고 "
+                 f"{case['case_no']} 판결입니다.")
+    card_audio, card_dur = cut_audio(99, card_text, "", "", out_dir, args.silent)
+    card_dur += 1.2
+    seg = out_dir / "seg_case.mp4"
+    run(["ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-i", str(card),
+         "-i", str(card_audio), "-af", "apad=pad_dur=1.2", "-t", f"{card_dur:.2f}",
+         "-vf", "scale=1080:1920,setsar=1", "-c:v", "libx264", "-preset", "veryfast",
+         "-r", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+         "-ar", "44100", "-ac", "2", str(seg)])
+    segs.append(seg)
+    print(f"  판례 카드 — {card_dur:.1f}초")
+
+    lst = out_dir / "list.txt"
     lst.write_text("".join(f"file '{s.name}'\n" for s in segs), encoding="utf-8")
-    final = OUT / "webtoon_short.mp4"
+    final = out_dir / "webtoon_short.mp4"
     run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
          "-i", str(lst), "-c", "copy", str(final)])
     print(f"완성: {final} ({dur_of(final):.1f}초)")
