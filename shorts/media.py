@@ -9,7 +9,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+import os
+
 from . import characters as CH
+from . import webtoon as WT
 from .config import DISCLAIMER, Settings
 
 W, H = 1080, 1920
@@ -270,8 +273,13 @@ def build_video(settings: Settings, case: dict, script: dict, workdir: Path, out
     for i, s in enumerate(scenes):
         img = workdir / f"f{i:02d}.png"
         who = CH.pick(s["narration"], s.get("character"))
-        render_scene(fpath, i, len(scenes), header, s.get("caption", ""), s["narration"], img,
-                     character=who)
+        if os.environ.get("WEBTOON", "").lower() in {"1", "true", "yes", "on"}:
+            # 중반부터 극적으로 — 집중선은 아껴 써야 효과가 산다
+            WT.render_cut(fpath, i, len(scenes), header, s.get("caption", ""), s["narration"],
+                          img, character=who, dramatic=i >= len(scenes) // 2)
+        else:
+            render_scene(fpath, i, len(scenes), header, s.get("caption", ""), s["narration"], img,
+                         character=who)
         seg = workdir / f"s{i:02d}.mp4"
         make_segment(img, audios[i], seg, idx=i)
         segs.append(seg)
